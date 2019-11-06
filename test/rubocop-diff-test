@@ -1,0 +1,91 @@
+#!/bin/bash
+
+FINAL_STATUS=0
+
+function assert_equals() {
+  if [ $# -ne 3 ]; then
+    echo "Incorrect arguments in the followingn assert_equals"
+    echo "  assert_equals $*"
+    exit 255
+  fi
+  local message=$1
+  local actual=$2
+  local expected=$3
+
+  if [ "$actual" == "$expected" ]; then
+    echo "${message}...✅"
+  else
+    echo "-----------------------------------"
+    echo "${message}...❌"
+    echo "  Actual:   '$actual'"
+    echo "  Expected: '$expected'"
+    echo "-----------------------------------"
+    FINAL_STATUS=1
+  fi
+}
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+current_path=$(pwd)
+path=~/tmp/rubocop-diff
+rm -rf "$path"
+mkdir -p "$path"
+
+cd "$path" || exit 1
+
+echo Initialize example with a file containing offence
+
+git init
+git config user.email "test@example.com"
+git config user.name "Rubocop"
+
+echo 'vendor/*' >> .gitignore
+
+cp "$current_path"/Gemfile .
+cp "$current_path"/Gemfile.lock .
+
+mkdir -p vendor
+
+if  [[ -n "${GITHUB_WORKSPACE}" ]];then
+  ln -s "${GITHUB_WORKSPACE}/"vendor/bundle vendor/bundle
+fi
+
+bundle config --local path vendor/bundle
+bundle install
+
+cp "$current_path"/test/examples/file_with_offences.rb file.rb
+git add .
+git commit -m "First commit"
+
+echo
+echo Adding more offence to the repo
+cp "$current_path"/test/examples/file_with_more_offences.rb file.rb
+git add .
+git commit -m "Add more offence"
+
+output=$("$current_path"/bin/rubocop-diff)
+exit_code="$?"
+last_output=$(echo "$output" | tail -1)
+expected_output="${RED}2${NC} offences introduced"
+
+assert_equals "It returns exit status 1"       "$exit_code" 1
+assert_equals "It returns total added offence" "$last_output" "$expected_output"
+
+echo
+echo Remove offences
+cp "$current_path"/test/examples/file_with_no_offences.rb file.rb
+git add .
+git commit -m "Remove offences"
+
+output=$("$current_path"/bin/rubocop-diff)
+exit_code="$?"
+last_output=$(echo "$output" | tail -1)
+expected_output="${GREEN}3${NC} offences corrected"
+
+assert_equals 'It returns exit status'         "$exit_code" 0
+assert_equals 'It returns total added offence' "$last_output" "$expected_output"
+
+echo
+exit "$FINAL_STATUS"
