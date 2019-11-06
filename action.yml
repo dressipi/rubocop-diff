@@ -2,5 +2,5 @@ name: 'Rubocop diff'
 description: 'Run a rubocop diff between last 2 commits'
 author: 'Dressipi'
 runs:
-  using: 'bash'
-  main: 'bin/rubocop-diff'
+  using: 'docker'
+  image: 'Dockerfile'
