@@ -1,25 +1,25 @@
-#!/bin/bash
+#!/bin/sh
 
-function extract_offences() {
-  echo "$1" | awk '{print $4}' | sed 's/no/0/g'
+extract_offences() {
+  printf "%s\n" "$1" | awk '{print $4}' | sed 's/no/0/g'
 }
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
 
 current_branch=$(git branch | grep '\*' | cut -d ' ' -f2)
 
-echo Running rubocop against current branch
+unset BUNDLE_PATH
+unset BUNDLE_APP_CONFIG
+bundle install
+
+printf "Running rubocop against current branch\n"
 current_commit_results=$(bundle exec rubocop | tail -1)
-echo "$current_commit_results"
+printf "%s\n" "$current_commit_results"
 
 git stash >&-
 git show HEAD~1 --pretty=format:"%h" --no-patch | xargs git checkout > /dev/null 2>&1
 
-echo Running rubocop against last commit
+printf "Running rubocop against last commit\n"
 previous_commit_results=$(bundle exec rubocop | tail -1)
-echo "$previous_commit_results"
+printf "%s\n" "$previous_commit_results\n"
 
 git checkout "$current_branch" > /dev/null 2>&1;
 git stash pop > /dev/null 2>&1
@@ -29,12 +29,12 @@ previous_offences=$(extract_offences "$previous_commit_results")
 
 offences_difference=$((current_offences - previous_offences))
 
-echo
+printf "\n"
 
 if [ "$offences_difference" -gt 0 ]; then
-  echo "${RED}$offences_difference${NC} offences introduced"
+  printf "❌ %d offences introduced\n" "$offences_difference"
   exit 1
 else
-  echo "${GREEN}${offences_difference#-}${NC} offences corrected"
+  printf "✅ %d offences corrected\n" "${offences_difference#-}"
   exit 0
 fi
